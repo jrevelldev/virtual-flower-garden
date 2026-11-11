@@ -92,8 +92,15 @@ export class GardenView {
   }
 
   private getVisitorTargetUrl(): string {
-    if (this.settings?.visitorUrl && !this.settings.visitorUrl.endsWith('.github.io/create')) {
-      return this.settings.visitorUrl;
+    const raw = this.settings?.visitorUrl;
+    if (
+      raw &&
+      raw.startsWith('http') &&
+      !raw.endsWith('.github.io/create') &&
+      !raw.endsWith('.github.io/create/') &&
+      (!window.location.pathname.includes('/virtual-flower-garden') || raw.includes('/virtual-flower-garden'))
+    ) {
+      return raw;
     }
     return getDefaultVisitorUrl();
   }

@@ -7,13 +7,9 @@ import { SAMPLE_FLOWERS } from './sample-flowers';
 export function getAppBaseUrl(): string {
   if (typeof window === 'undefined') return 'https://thelivinggarden.art';
   const origin = window.location.origin;
-  const path = window.location.pathname;
-  const segments = path.split('/').filter(Boolean);
-  const knownRoutes = ['garden', 'create', 'admin', 'index.html'];
-  const basePath = segments.length > 0 && !knownRoutes.includes(segments[0])
-    ? `/${segments[0]}`
-    : '';
-  return `${origin}${basePath}`;
+  const path = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/+$/, '');
+  const cleanPath = path.replace(/\/(garden|create|admin)$/, '');
+  return `${origin}${cleanPath}`;
 }
 
 export function getDefaultVisitorUrl(): string {
@@ -125,12 +121,15 @@ export class DataService {
         if (
           !parsed.visitorUrl ||
           parsed.visitorUrl.endsWith('.github.io/create') ||
+          parsed.visitorUrl.endsWith('.github.io/create/') ||
+          !parsed.visitorUrl.includes('/create') ||
           (typeof window !== 'undefined' &&
-            parsed.visitorUrl.startsWith(window.location.origin) &&
-            !parsed.visitorUrl.includes('/virtual-flower-garden') &&
-            window.location.pathname.includes('/virtual-flower-garden'))
+            parsed.visitorUrl.includes(window.location.host) &&
+            window.location.pathname.includes('/virtual-flower-garden') &&
+            !parsed.visitorUrl.includes('/virtual-flower-garden'))
         ) {
           parsed.visitorUrl = getDefaultVisitorUrl();
+          localStorage.setItem('living_garden_settings', JSON.stringify({ ...DEFAULT_SETTINGS, ...parsed }));
         }
         return { ...DEFAULT_SETTINGS, ...parsed };
       } catch {
