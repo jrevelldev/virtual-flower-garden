@@ -33,7 +33,6 @@ const COLOR_PRESETS = [
 
 export class CreateView {
   private container: HTMLElement;
-  private currentStep: 'design' | 'message' | 'plant' = 'design';
   private design: FlowerDesign = { ...DEFAULT_DESIGN };
   private displayName = '';
   private message = '';
@@ -106,45 +105,28 @@ export class CreateView {
             <span class="garden-icon">🌱</span>
             <h1>The Living Garden</h1>
           </div>
-          <nav class="create-steps" id="create-steps-nav">
-            <button class="step-btn active" data-step="design">
-              <span class="step-num">1</span> Design
-            </button>
-            <button class="step-btn" data-step="message">
-              <span class="step-num">2</span> Message
-            </button>
-            <button class="step-btn" data-step="plant" disabled>
-              <span class="step-num">3</span> Plant
-            </button>
-          </nav>
+          <a href="./#/garden" class="header-garden-link" title="Return to 3D Garden View">
+            View Garden 🌸
+          </a>
         </header>
 
-        <!-- Main Content Area -->
+        <!-- Main Content Area: Responsive 2-Column Desktop, Sticky Preview Mobile -->
         <main class="create-main">
-          <!-- Live Preview Card (Persistent DOM) -->
-          <div class="preview-card">
-            <div class="preview-canvas-holder" id="flower-preview-holder"></div>
-            <div class="preview-badge">
-              <span>Interactive 3D Preview (drag to rotate)</span>
+          <!-- Live Preview Card (Persistent Sticky DOM) -->
+          <div class="preview-container-sticky">
+            <div class="preview-card">
+              <div class="preview-canvas-holder" id="flower-preview-holder"></div>
+              <div class="preview-badge">
+                <span>Interactive 3D Preview (drag to rotate)</span>
+              </div>
             </div>
           </div>
 
-          <!-- Dynamic Controls Panel -->
+          <!-- Dynamic Controls Panel (Unified Single-Page Flow) -->
           <div class="controls-panel" id="controls-panel"></div>
         </main>
       </div>
     `;
-
-    // Bind step buttons in header
-    this.container.querySelector('#create-steps-nav')?.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest('.step-btn') as HTMLButtonElement;
-      if (!btn || btn.disabled) return;
-      const step = btn.dataset.step as any;
-      if (step && step !== this.currentStep) {
-        this.currentStep = step;
-        this.renderControls();
-      }
-    });
   }
 
   /**
@@ -154,150 +136,141 @@ export class CreateView {
     const panel = this.container.querySelector('#controls-panel');
     if (!panel) return;
 
-    // Update Header Step Navigation
-    const nav = this.container.querySelector('#create-steps-nav');
-    if (nav) {
-      nav.querySelectorAll('.step-btn').forEach((b) => {
-        const btn = b as HTMLButtonElement;
-        const step = btn.dataset.step;
-        if (step === this.currentStep) btn.classList.add('active');
-        else btn.classList.remove('active');
-
-        if (step === 'plant') {
-          btn.disabled = !this.message.trim();
-        }
-      });
+    if (this.submissionStatus !== 'idle') {
+      panel.innerHTML = `
+        <div class="step-section plant-summary">
+          ${this.renderPlantState()}
+        </div>
+      `;
+      this.bindControlEvents();
+      return;
     }
 
     const messageGraphemes = countGraphemes(this.message);
     const nameGraphemes = countGraphemes(this.displayName);
     const rtl = isRTL(this.message);
 
-    panel.innerHTML = this.renderStepContent(messageGraphemes, nameGraphemes, rtl);
-
+    panel.innerHTML = this.renderUnifiedContent(messageGraphemes, nameGraphemes, rtl);
     this.bindControlEvents();
   }
 
-  private renderStepContent(msgLen: number, nameLen: number, rtl: boolean): string {
-    if (this.currentStep === 'design') {
-      return `
-        <div class="step-section">
-          <div class="step-actions-top">
-            <button id="btn-surprise" class="btn-secondary" title="Randomize flower design">
-              🎲 Surprise Me
-            </button>
-            <button id="btn-reset" class="btn-ghost" title="Reset to default">
-              ↺ Reset
-            </button>
-          </div>
+  private renderUnifiedContent(msgLen: number, nameLen: number, rtl: boolean): string {
+    return `
+      <div class="unified-creator-form">
+        <!-- Top Quick Actions -->
+        <div class="step-actions-top">
+          <button id="btn-surprise" class="btn-secondary" title="Randomize flower design">
+            🎲 Surprise Me
+          </button>
+          <button id="btn-reset" class="btn-ghost" title="Reset to default">
+            ↺ Reset
+          </button>
+        </div>
 
-          <!-- Petal Shapes -->
-          <div class="control-group">
-            <label class="group-label">Petal Shape</label>
-            <div class="shape-chips">
-              ${(['rounded', 'pointed', 'teardrop', 'heart', 'ruffled'] as PetalShape[]).map((shape) => `
-                <button class="chip ${this.design.petalShape === shape ? 'selected' : ''}" data-shape="${shape}">
-                  ${shape.charAt(0).toUpperCase() + shape.slice(1)}
-                </button>
-              `).join('')}
-            </div>
-          </div>
-
-          <!-- Color Palettes -->
-          <div class="control-group">
-            <label class="group-label">Color Harmony Presets</label>
-            <div class="palette-grid">
-              ${COLOR_PRESETS.map((p, i) => `
-                <button class="palette-card ${this.design.primaryColor === p.primary && this.design.secondaryColor === p.secondary ? 'selected' : ''}" data-preset-idx="${i}">
-                  <div class="palette-swatches">
-                    <span class="swatch" style="background:${p.primary}"></span>
-                    <span class="swatch" style="background:${p.secondary}"></span>
-                    <span class="swatch" style="background:${p.center}"></span>
-                  </div>
-                  <span class="palette-name">${p.name}</span>
-                </button>
-              `).join('')}
-            </div>
-          </div>
-
-          <!-- Core Sliders -->
-          <div class="control-group">
-            <div class="slider-row">
-              <label for="input-petal-count">Petal Count: <strong id="val-petal-count">${this.design.petalCount}</strong></label>
-              <input type="range" id="input-petal-count" min="4" max="24" step="1" value="${this.design.petalCount}" />
-            </div>
-
-            <div class="slider-row">
-              <label for="input-petal-layers">Petal Layers: <strong id="val-petal-layers">${this.design.petalLayers}</strong></label>
-              <input type="range" id="input-petal-layers" min="1" max="3" step="1" value="${this.design.petalLayers}" />
-            </div>
-
-            <div class="slider-row">
-              <label for="input-stem-height">Stem Height: <strong id="val-stem-height">${this.design.stemHeight.toFixed(1)}m</strong></label>
-              <input type="range" id="input-stem-height" min="0.8" max="2.8" step="0.1" value="${this.design.stemHeight}" />
-            </div>
-          </div>
-
-          <!-- Collapsible Advanced Controls -->
-          <details class="advanced-details">
-            <summary class="advanced-summary">Advanced Customization</summary>
-            <div class="advanced-content">
-              <div class="color-picker-row">
-                <div class="color-picker-item">
-                  <label for="custom-primary">Primary Petal</label>
-                  <input type="color" id="custom-primary" value="${this.design.primaryColor}" />
-                </div>
-                <div class="color-picker-item">
-                  <label for="custom-secondary">Inner Layer</label>
-                  <input type="color" id="custom-secondary" value="${this.design.secondaryColor}" />
-                </div>
-                <div class="color-picker-item">
-                  <label for="custom-center">Center Receptacle</label>
-                  <input type="color" id="custom-center" value="${this.design.centerColor}" />
-                </div>
-              </div>
-
-              <div class="slider-row">
-                <label for="input-petal-length">Petal Length: <strong id="val-petal-length">${this.design.petalLength.toFixed(1)}</strong></label>
-                <input type="range" id="input-petal-length" min="0.6" max="2.0" step="0.05" value="${this.design.petalLength}" />
-              </div>
-
-              <div class="slider-row">
-                <label for="input-petal-width">Petal Width: <strong id="val-petal-width">${this.design.petalWidth.toFixed(1)}</strong></label>
-                <input type="range" id="input-petal-width" min="0.4" max="1.8" step="0.05" value="${this.design.petalWidth}" />
-              </div>
-
-              <div class="slider-row">
-                <label for="input-petal-curvature">Petal Arch: <strong id="val-petal-curvature">${this.design.petalCurvature < 0 ? 'Cupped' : this.design.petalCurvature > 0 ? 'Rolled' : 'Flat'}</strong></label>
-                <input type="range" id="input-petal-curvature" min="-0.8" max="0.8" step="0.05" value="${this.design.petalCurvature}" />
-              </div>
-
-              <div class="slider-row">
-                <label for="input-leaf-count">Leaf Count: <strong id="val-leaf-count">${this.design.leafCount}</strong></label>
-                <input type="range" id="input-leaf-count" min="1" max="6" step="1" value="${this.design.leafCount}" />
-              </div>
-
-              <div class="slider-row">
-                <label for="input-imperfection">Organic Variety (Natural Touch): <strong id="val-imperfection">${Math.round((this.design.imperfection ?? 0.35) * 100)}%</strong></label>
-                <input type="range" id="input-imperfection" min="0" max="1" step="0.05" value="${this.design.imperfection ?? 0.35}" />
-              </div>
-            </div>
-          </details>
-
-          <!-- Navigation CTA -->
-          <div class="step-footer">
-            <button id="btn-to-message" class="btn-primary full-width">
-              Continue to Message →
-            </button>
+        <!-- Section 1: Petal Shapes -->
+        <div class="control-group">
+          <label class="group-label">Petal Shape</label>
+          <div class="shape-chips">
+            ${(['rounded', 'pointed', 'teardrop', 'heart', 'ruffled'] as PetalShape[]).map((shape) => `
+              <button class="chip ${this.design.petalShape === shape ? 'selected' : ''}" data-shape="${shape}">
+                ${shape.charAt(0).toUpperCase() + shape.slice(1)}
+              </button>
+            `).join('')}
           </div>
         </div>
-      `;
-    }
 
-    if (this.currentStep === 'message') {
-      return `
-        <div class="step-section">
-          <h2>Give Your Flower a Voice</h2>
+        <!-- Section 2: Color Harmony Presets -->
+        <div class="control-group">
+          <label class="group-label">Color Harmony Presets</label>
+          <div class="palette-grid">
+            ${COLOR_PRESETS.map((p, i) => `
+              <button class="palette-card ${this.design.primaryColor === p.primary && this.design.secondaryColor === p.secondary ? 'selected' : ''}" data-preset-idx="${i}">
+                <div class="palette-swatches">
+                  <span class="swatch" style="background:${p.primary}"></span>
+                  <span class="swatch" style="background:${p.secondary}"></span>
+                  <span class="swatch" style="background:${p.center}"></span>
+                </div>
+                <span class="palette-name">${p.name}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Section 3: Custom Colors (Directly visible, no collapsed options) -->
+        <div class="control-group">
+          <label class="group-label">Custom Palette Tuner</label>
+          <div class="color-picker-row">
+            <div class="color-picker-item">
+              <label for="custom-primary">Primary Petal</label>
+              <input type="color" id="custom-primary" value="${this.design.primaryColor}" />
+            </div>
+            <div class="color-picker-item">
+              <label for="custom-secondary">Inner Layer</label>
+              <input type="color" id="custom-secondary" value="${this.design.secondaryColor}" />
+            </div>
+            <div class="color-picker-item">
+              <label for="custom-center">Center</label>
+              <input type="color" id="custom-center" value="${this.design.centerColor}" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: All Sliders & Dimensions (Directly open and visible) -->
+        <div class="control-group sliders-grid">
+          <label class="group-label">Flower Dimensions & Form</label>
+
+          <div class="slider-row">
+            <label for="input-petal-count">Petal Count: <strong id="val-petal-count">${this.design.petalCount}</strong></label>
+            <input type="range" id="input-petal-count" min="4" max="24" step="1" value="${this.design.petalCount}" />
+          </div>
+
+          <div class="slider-row">
+            <label for="input-petal-layers">Petal Layers: <strong id="val-petal-layers">${this.design.petalLayers}</strong></label>
+            <input type="range" id="input-petal-layers" min="1" max="3" step="1" value="${this.design.petalLayers}" />
+          </div>
+
+          <div class="slider-row">
+            <label for="input-stem-height">Stem Height: <strong id="val-stem-height">${this.design.stemHeight.toFixed(1)}m</strong></label>
+            <input type="range" id="input-stem-height" min="0.8" max="2.8" step="0.1" value="${this.design.stemHeight}" />
+          </div>
+
+          <div class="slider-row">
+            <label for="input-petal-length">Petal Length: <strong id="val-petal-length">${this.design.petalLength.toFixed(1)}</strong></label>
+            <input type="range" id="input-petal-length" min="0.6" max="2.0" step="0.05" value="${this.design.petalLength}" />
+          </div>
+
+          <div class="slider-row">
+            <label for="input-petal-width">Petal Width: <strong id="val-petal-width">${this.design.petalWidth.toFixed(1)}</strong></label>
+            <input type="range" id="input-petal-width" min="0.4" max="1.8" step="0.05" value="${this.design.petalWidth}" />
+          </div>
+
+          <div class="slider-row">
+            <label for="input-petal-curvature">Petal Arch: <strong id="val-petal-curvature">${this.design.petalCurvature < 0 ? 'Cupped' : this.design.petalCurvature > 0 ? 'Rolled' : 'Flat'}</strong></label>
+            <input type="range" id="input-petal-curvature" min="-0.8" max="0.8" step="0.05" value="${this.design.petalCurvature}" />
+          </div>
+
+          <div class="slider-row">
+            <label for="input-leaf-count">Leaf Count: <strong id="val-leaf-count">${this.design.leafCount}</strong></label>
+            <input type="range" id="input-leaf-count" min="1" max="6" step="1" value="${this.design.leafCount}" />
+          </div>
+
+          <div class="slider-row">
+            <label for="input-imperfection">Organic Touch (Natural Variety): <strong id="val-imperfection">${Math.round((this.design.imperfection ?? 0.35) * 100)}%</strong></label>
+            <input type="range" id="input-imperfection" min="0" max="1" step="0.05" value="${this.design.imperfection ?? 0.35}" />
+          </div>
+        </div>
+
+        <div class="section-nav-actions">
+          <button id="btn-to-message" class="btn-secondary full-width">
+            Continue to Message & Dedication ↓
+          </button>
+        </div>
+
+        <hr class="section-divider" />
+
+        <!-- Section 5: Message & Dedication -->
+        <div class="message-section" id="section-message">
+          <h2 class="section-title">Give Your Flower a Voice</h2>
           <p class="section-desc">Share a thought, wish, greeting, or memory. It will accompany your flower permanently in the gallery.</p>
 
           <div class="control-group">
@@ -321,9 +294,9 @@ export class CreateView {
             </div>
             <textarea
               id="input-message"
-              rows="4"
+              rows="3"
               dir="${rtl ? 'rtl' : 'auto'}"
-              placeholder="Write in any language... (Arabic, Japanese, Spanish, Hindi, Emojis 🌸✨)"
+              placeholder="Write in any language... (Catalan, English, Japanese, Arabic, Emojis 🌸✨)"
             >${this.message}</textarea>
           </div>
 
@@ -332,20 +305,30 @@ export class CreateView {
             <span>Your name and message will be publicly displayed on the gallery screen. No personal data or email is collected.</span>
           </div>
 
-          <div class="step-footer split-buttons">
-            <button id="btn-back-to-design" class="btn-secondary">← Back to Design</button>
-            <button id="btn-to-plant" class="btn-primary" ${!this.message.trim() || msgLen > 280 ? 'disabled' : ''}>
-              Ready to Plant 🌱
+          <div class="section-nav-actions">
+            <button id="btn-to-plant" class="btn-secondary full-width">
+              Review & Plant Flower ↓
             </button>
           </div>
         </div>
-      `;
-    }
 
-    // Step: 'plant'
-    return `
-      <div class="step-section plant-summary">
-        ${this.renderPlantState()}
+        <!-- Section 6: Live Summary & Direct Plant Action -->
+        <div class="plant-section" id="section-plant">
+          <div class="flower-summary-card">
+            <p class="summary-creator"><strong>Creator:</strong> <span id="summary-creator-val">${this.displayName.trim() || 'A visitor'}</span></p>
+            <p class="summary-message" id="summary-msg-val" dir="${rtl ? 'rtl' : 'auto'}">“${this.message.trim() || 'Your message will appear here...'}”</p>
+            <div class="summary-details">
+              <span id="summary-shape-val">${this.design.petalShape} petals (${this.design.petalCount})</span> •
+              <span id="summary-layers-val">${this.design.petalLayers} ${this.design.petalLayers === 1 ? 'layer' : 'layers'}</span>
+            </div>
+          </div>
+
+          <div class="step-footer">
+            <button id="btn-plant-now" class="btn-primary btn-large full-width" ${!this.message.trim() || msgLen > 280 ? 'disabled' : ''}>
+              Plant My Flower in Garden 🌱
+            </button>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -617,20 +600,57 @@ export class CreateView {
     const panel = this.container.querySelector('#controls-panel');
     if (!panel) return;
 
-    // Step 1: Shape chips
+    if (this.submissionStatus !== 'idle') {
+      panel.querySelector('#btn-retry-plant')?.addEventListener('click', () => {
+        this.executePlant();
+      });
+
+      panel.querySelector('#btn-plant-another')?.addEventListener('click', () => {
+        this.idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        this.message = '';
+        this.displayName = '';
+        this.submissionStatus = 'idle';
+        this.saveDraft();
+        this.renderControls();
+        this.updatePreviewObject();
+      });
+      return;
+    }
+
+    const updateSummary = () => {
+      const creatorEl = panel.querySelector('#summary-creator-val');
+      if (creatorEl) creatorEl.textContent = this.displayName.trim() || 'A visitor';
+      const msgEl = panel.querySelector('#summary-msg-val');
+      if (msgEl) {
+        msgEl.textContent = this.message.trim() ? `“${this.message.trim()}”` : '“Your message will appear here...”';
+        msgEl.setAttribute('dir', isRTL(this.message) ? 'rtl' : 'auto');
+      }
+      const shapeEl = panel.querySelector('#summary-shape-val');
+      if (shapeEl) shapeEl.textContent = `${this.design.petalShape} petals (${this.design.petalCount})`;
+      const layersEl = panel.querySelector('#summary-layers-val');
+      if (layersEl) layersEl.textContent = `${this.design.petalLayers} ${this.design.petalLayers === 1 ? 'layer' : 'layers'}`;
+
+      const plantBtn = panel.querySelector('#btn-plant-now') as HTMLButtonElement;
+      if (plantBtn) {
+        const msgLen = countGraphemes(this.message);
+        plantBtn.disabled = !this.message.trim() || msgLen > 280;
+      }
+    };
+
+    // Shape chips
     panel.querySelectorAll('.chip[data-shape]').forEach((chip) => {
       chip.addEventListener('click', (e) => {
         const shape = (e.currentTarget as HTMLElement).dataset.shape as PetalShape;
         this.design.petalShape = shape;
         this.saveDraft();
-        // Update selected class without wiping DOM
         panel.querySelectorAll('.chip[data-shape]').forEach((c) => c.classList.remove('selected'));
         (e.currentTarget as HTMLElement).classList.add('selected');
+        updateSummary();
         this.updatePreviewObject();
       });
     });
 
-    // Step 1: Preset Palettes
+    // Preset Palettes
     panel.querySelectorAll('.palette-card[data-preset-idx]').forEach((card) => {
       card.addEventListener('click', (e) => {
         const idx = Number((e.currentTarget as HTMLElement).dataset.presetIdx);
@@ -640,20 +660,29 @@ export class CreateView {
           this.design.secondaryColor = preset.secondary;
           this.design.centerColor = preset.center;
           this.saveDraft();
-          // Update selected palette
           panel.querySelectorAll('.palette-card').forEach((c) => c.classList.remove('selected'));
           (e.currentTarget as HTMLElement).classList.add('selected');
+
+          // Sync custom color pickers
+          const pCol = panel.querySelector('#custom-primary') as HTMLInputElement;
+          if (pCol) pCol.value = preset.primary;
+          const sCol = panel.querySelector('#custom-secondary') as HTMLInputElement;
+          if (sCol) sCol.value = preset.secondary;
+          const cCol = panel.querySelector('#custom-center') as HTMLInputElement;
+          if (cCol) cCol.value = preset.center;
+
           this.updatePreviewObject();
         }
       });
     });
 
-    // Step 1: Surprise Me
+    // Surprise Me
     panel.querySelector('#btn-surprise')?.addEventListener('click', () => {
       this.randomizeDesign();
+      updateSummary();
     });
 
-    // Step 1: Reset
+    // Reset
     panel.querySelector('#btn-reset')?.addEventListener('click', () => {
       this.design = { ...DEFAULT_DESIGN };
       this.saveDraft();
@@ -666,12 +695,14 @@ export class CreateView {
       this.design.petalCount = parseInt(v);
       const el = document.getElementById('val-petal-count');
       if (el) el.textContent = v;
+      updateSummary();
     });
 
     this.bindRangeInput('input-petal-layers', (v) => {
       this.design.petalLayers = parseInt(v);
       const el = document.getElementById('val-petal-layers');
       if (el) el.textContent = v;
+      updateSummary();
     });
 
     this.bindRangeInput('input-stem-height', (v) => {
@@ -725,30 +756,7 @@ export class CreateView {
     bindColor('custom-secondary', 'secondaryColor');
     bindColor('custom-center', 'centerColor');
 
-    // Navigation buttons
-    panel.querySelector('#btn-to-message')?.addEventListener('click', () => {
-      this.currentStep = 'message';
-      this.renderControls();
-    });
-
-    panel.querySelector('#btn-back-to-design')?.addEventListener('click', () => {
-      this.currentStep = 'design';
-      this.renderControls();
-    });
-
-    panel.querySelector('#btn-to-plant')?.addEventListener('click', () => {
-      if (this.message.trim().length > 0) {
-        this.currentStep = 'plant';
-        this.renderControls();
-      }
-    });
-
-    panel.querySelector('#btn-back-to-message')?.addEventListener('click', () => {
-      this.currentStep = 'message';
-      this.renderControls();
-    });
-
-    // Inputs in Step 2
+    // Message inputs
     const nameInput = panel.querySelector('#input-display-name') as HTMLInputElement;
     nameInput?.addEventListener('input', (e) => {
       this.displayName = (e.target as HTMLInputElement).value;
@@ -757,6 +765,7 @@ export class CreateView {
       if (countEl) {
         countEl.textContent = `${countGraphemes(this.displayName)}/40`;
       }
+      updateSummary();
     });
 
     const msgInput = panel.querySelector('#input-message') as HTMLTextAreaElement;
@@ -770,31 +779,21 @@ export class CreateView {
         if (msgLen > 280) countEl.classList.add('over-limit');
         else countEl.classList.remove('over-limit');
       }
-
-      const plantBtn = panel.querySelector('#btn-to-plant') as HTMLButtonElement;
-      if (plantBtn) {
-        plantBtn.disabled = !this.message.trim() || msgLen > 280;
-      }
+      updateSummary();
     });
 
-    // Step 3 Actions
+    // Compatibility scroll anchors for tests
+    panel.querySelector('#btn-to-message')?.addEventListener('click', () => {
+      panel.querySelector('#section-message')?.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    panel.querySelector('#btn-to-plant')?.addEventListener('click', () => {
+      panel.querySelector('#section-plant')?.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // Plant Flower CTA
     panel.querySelector('#btn-plant-now')?.addEventListener('click', () => {
       this.executePlant();
-    });
-
-    panel.querySelector('#btn-retry-plant')?.addEventListener('click', () => {
-      this.executePlant();
-    });
-
-    panel.querySelector('#btn-plant-another')?.addEventListener('click', () => {
-      this.idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      this.message = '';
-      this.displayName = '';
-      this.submissionStatus = 'idle';
-      this.currentStep = 'design';
-      this.saveDraft();
-      this.renderControls();
-      this.updatePreviewObject();
     });
   }
 
