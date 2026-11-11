@@ -31,7 +31,7 @@ export class GardenCameraController {
   private pointerStartY = 0;
   private pointerCurrentX = 0;
   private pointerCurrentY = 0;
-  private spherical = new THREE.Spherical(35, Math.PI * 0.32, 0.4);
+  private spherical = new THREE.Spherical(40, Math.PI * 0.30, 0.4);
   private target = new THREE.Vector3(0, 2, 0);
 
   // Transition interpolation
@@ -154,7 +154,7 @@ export class GardenCameraController {
     this.cancelActiveTransition();
     this.setMode('manual');
 
-    const highCam = new THREE.Vector3(0, 38, 48);
+    const highCam = new THREE.Vector3(0, 44, 52);
     const centerTarget = new THREE.Vector3(0, 1, 0);
 
     this.transitionTo(highCam, centerTarget, 2.0, () => {
@@ -199,19 +199,19 @@ export class GardenCameraController {
 
     // 2. Mode-specific updates
     if (this.mode === 'attract') {
-      this.attractTime += delta * 0.12;
-      const radius = 32 + Math.sin(this.attractTime * 0.4) * 8;
-      const angle = this.attractTime * 0.35;
+      this.attractTime += delta * 0.10;
+      const radius = 40 + Math.sin(this.attractTime * 0.35) * 6;
+      const angle = this.attractTime * 0.28;
       const cx = Math.cos(angle) * radius;
       const cz = Math.sin(angle) * radius;
-      const cy = Math.max(getTerrainHeight(cx, cz) + 6, 8 + Math.sin(this.attractTime * 0.7) * 4);
+      const cy = Math.max(getTerrainHeight(cx, cz) + 9, 14 + Math.sin(this.attractTime * 0.5) * 3);
 
       this.camera.position.set(cx, cy, cz);
       // Gentle center bobbing
       this.attractCenter.set(
-        Math.sin(this.attractTime * 0.25) * 4,
-        2.5 + Math.cos(this.attractTime * 0.3) * 1.5,
-        Math.cos(this.attractTime * 0.25) * 4
+        Math.sin(this.attractTime * 0.2) * 3,
+        2.2 + Math.cos(this.attractTime * 0.25) * 1.0,
+        Math.cos(this.attractTime * 0.2) * 3
       );
       this.camera.lookAt(this.attractCenter);
       this.clampCameraAboveTerrain();

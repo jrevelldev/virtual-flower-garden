@@ -48,20 +48,20 @@ export function hash2D(x: number, y: number): number {
  * Properties:
  * - Slot n placement is 100% deterministic and never changes when new flowers are added.
  * - Naturally expands outward from the center as the garden grows.
- * - Guaranteed minimum clearance (>= 3.4m) between flowers prevents petal clipping.
+ * - Generous spacing (>= 5.0m) prevents petal clipping both in 3D and in camera perspective.
  */
 function getRawSlotPosition(slotIndex: number, seed: number): { x: number; z: number } {
-  const spacing = 3.6; // Distance scaling so flower heads have breathing room
+  const spacing = 5.2; // Generous distance scaling so flower heads have complete breathing room
   const goldenAngle = 2.39996323; // ~137.50776 degrees in radians
 
   const baseR = spacing * Math.sqrt(slotIndex + 1.2);
   const baseTheta = (slotIndex + 1) * goldenAngle;
 
   // Controlled organic jitter
-  const jR = (hash2D(slotIndex, seed) - 0.5) * 0.25 * spacing;
-  const jTheta = (hash2D(seed, slotIndex) - 0.5) * 0.15;
+  const jR = (hash2D(slotIndex, seed) - 0.5) * 0.18 * spacing;
+  const jTheta = (hash2D(seed, slotIndex) - 0.5) * 0.10;
 
-  const r = Math.max(2.0, baseR + jR);
+  const r = Math.max(2.5, baseR + jR);
   const theta = baseTheta + jTheta;
 
   return {
@@ -71,27 +71,32 @@ function getRawSlotPosition(slotIndex: number, seed: number): { x: number; z: nu
 }
 
 export function calculateSlotPlacement(slotIndex: number, seed: number = 42): FlowerPlacement {
-  const minClearance = 3.4; // Strict clearance so petals never collide or overlap
+  const minClearance = 5.0; // Strict clearance so petals never collide, overlap or clip
   let { x, z } = getRawSlotPosition(slotIndex, seed);
 
-  // Deterministic collision clearance check against preceding slots
+  // Deterministic multi-pass collision clearance check against preceding slots
   if (slotIndex > 0) {
     const maxLookback = Math.min(slotIndex, 100);
-    for (let k = 0; k < maxLookback; k++) {
-      const prevPos = getRawSlotPosition(k, 42 + k * 101);
-      let dx = x - prevPos.x;
-      let dz = z - prevPos.z;
-      let dist = Math.hypot(dx, dz);
-      if (dist < minClearance) {
-        if (dist < 0.001) {
-          dx = 1.0;
-          dz = 0.0;
-          dist = 1.0;
+    for (let pass = 0; pass < 3; pass++) {
+      let moved = false;
+      for (let k = 0; k < maxLookback; k++) {
+        const prevPos = getRawSlotPosition(k, 42 + (k % 14) * 101);
+        let dx = x - prevPos.x;
+        let dz = z - prevPos.z;
+        let dist = Math.hypot(dx, dz);
+        if (dist < minClearance) {
+          if (dist < 0.001) {
+            dx = 1.0;
+            dz = 0.0;
+            dist = 1.0;
+          }
+          const push = (minClearance - dist) + 0.2;
+          x += (dx / dist) * push;
+          z += (dz / dist) * push;
+          moved = true;
         }
-        const push = (minClearance - dist) + 0.15;
-        x += (dx / dist) * push;
-        z += (dz / dist) * push;
       }
+      if (!moved) break;
     }
   }
 

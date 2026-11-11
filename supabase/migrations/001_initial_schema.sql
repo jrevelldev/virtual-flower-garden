@@ -114,7 +114,7 @@ DECLARE
   v_sub_id UUID;
   v_now TIMESTAMPTZ := timezone('utc'::text, now());
   v_status TEXT;
-  v_spacing NUMERIC := 2.4;
+  v_spacing NUMERIC := 5.2;
   v_golden_angle NUMERIC := 2.39996323;
   v_r NUMERIC;
   v_theta NUMERIC;

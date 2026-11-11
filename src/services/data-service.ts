@@ -175,17 +175,35 @@ export class DataService {
           }
         }
 
-        // 2. Ensure any custom-planted flower with a slot index also uses the updated collision-free placement
+        // 2. Ensure unique slot allocation without collisions or duplicate slots
+        const occupiedSlots = new Set<number>();
+        // First record all sample flower slots
+        for (const sf of SAMPLE_FLOWERS) {
+          occupiedSlots.add(sf.placement.slotIndex);
+        }
+
+        let nextAvailableSlot = SAMPLE_FLOWERS.length;
         for (const flower of parsed) {
-          if (!flower.id.startsWith('sample-') && flower.placement && typeof flower.placement.slotIndex === 'number') {
-            const canonicalPlacement = calculateSlotPlacement(flower.placement.slotIndex, flower.seed);
-            if (
-              Math.abs(flower.placement.x - canonicalPlacement.x) > 0.05 ||
-              Math.abs(flower.placement.z - canonicalPlacement.z) > 0.05
-            ) {
-              flower.placement = canonicalPlacement;
+          if (!flower.id.startsWith('sample-')) {
+            let slot = flower.placement?.slotIndex;
+            if (typeof slot !== 'number' || occupiedSlots.has(slot)) {
+              while (occupiedSlots.has(nextAvailableSlot)) {
+                nextAvailableSlot++;
+              }
+              slot = nextAvailableSlot++;
+              flower.placement = calculateSlotPlacement(slot, flower.seed);
               changed = true;
+            } else {
+              const canonicalPlacement = calculateSlotPlacement(slot, flower.seed);
+              if (
+                Math.abs(flower.placement.x - canonicalPlacement.x) > 0.05 ||
+                Math.abs(flower.placement.z - canonicalPlacement.z) > 0.05
+              ) {
+                flower.placement = canonicalPlacement;
+                changed = true;
+              }
             }
+            occupiedSlots.add(slot);
           }
         }
 
@@ -311,7 +329,11 @@ export class DataService {
 
     // 3. Local Mode Atomic Slot Calculation
     const all = await this.getAllSubmissions();
-    const nextSlot = all.length;
+    const maxOccupiedSlot = all.reduce(
+      (max, f) => Math.max(max, f.placement?.slotIndex ?? -1),
+      SAMPLE_FLOWERS.length - 1
+    );
+    const nextSlot = maxOccupiedSlot + 1;
     const seed = Math.floor(Math.random() * 1000000);
     const code = generateFlowerCode(seed);
     const placement = calculateSlotPlacement(nextSlot, seed);

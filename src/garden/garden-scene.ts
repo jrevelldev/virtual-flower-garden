@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { PublicFlower, GardenWeather } from '../types/garden';
 import { GeneratedFlowerInstance, generateFlowerObject } from '../flower/flower-generator';
-import { getTerrainHeight, getTerrainNormal, hash2D } from '../services/terrain';
+import { calculateSlotPlacement, getTerrainHeight, getTerrainNormal, hash2D } from '../services/terrain';
 import { GardenCameraController } from './camera-controller';
 import {
   createAtmosphericSkyDome,
@@ -951,13 +951,8 @@ export class GardenScene {
       const pCol = colors[slot % colors.length];
       const sCol = colors[(slot + 2) % colors.length];
 
-      // Phyllotaxis placement
-      const spacing = 2.4;
-      const r = spacing * Math.sqrt(slot + 1.2);
-      const theta = (slot + 1) * 2.39996323;
-      const x = Math.cos(theta) * r;
-      const z = Math.sin(theta) * r;
-      const y = getTerrainHeight(x, z);
+      // Deterministic collision-free placement
+      const placement = calculateSlotPlacement(slot, seed);
 
       const f: PublicFlower = {
         id: `stress-${slot}`,
@@ -981,14 +976,7 @@ export class GardenScene {
         },
         generatorVersion: 1,
         seed,
-        placement: {
-          x: Math.round(x * 100) / 100,
-          y: Math.round(y * 100) / 100,
-          z: Math.round(z * 100) / 100,
-          rotationY: (slot * 1.7) % (Math.PI * 2),
-          scale: 0.85 + (slot % 4) * 0.08,
-          slotIndex: slot,
-        },
+        placement,
         createdAt: new Date().toISOString(),
         publishedAt: new Date().toISOString(),
         status: 'approved',

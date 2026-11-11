@@ -42,7 +42,7 @@ describe('Terrain & Slot Placement Algorithms', () => {
 
   it('guarantees safe clearance between all flower slots to prevent petal overlap', () => {
     const slots = Array.from({ length: 25 }, (_, i) => calculateSlotPlacement(i, 42 + i * 7));
-    const minRequiredDistance = 3.0; // Petals have radius ~1.2-1.4m, so 3.0m ensures zero collision
+    const minRequiredDistance = 5.0; // Strict clearance so petals never touch or overlap
     let minObserved = Infinity;
     let closestPair = [-1, -1];
 
