@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 import { PublicFlower, InstallationSettings, GardenWeather } from '../types/garden';
 import { GardenScene } from '../garden/garden-scene';
-import { dataService } from '../services/data-service';
+import { dataService, getDefaultVisitorUrl } from '../services/data-service';
 import { isRTL } from '../services/text-utils';
 
 export class GardenView {
@@ -91,8 +91,16 @@ export class GardenView {
     this.bindEvents();
   }
 
+  private getVisitorTargetUrl(): string {
+    if (this.settings?.visitorUrl && !this.settings.visitorUrl.endsWith('.github.io/create')) {
+      return this.settings.visitorUrl;
+    }
+    return getDefaultVisitorUrl();
+  }
+
   private renderLayout(): void {
     const isLocalMode = !dataService.isSupabaseConnected;
+    const targetUrl = this.getVisitorTargetUrl();
 
     this.container.innerHTML = `
       <div class="garden-page">
@@ -107,8 +115,8 @@ export class GardenView {
           <div class="invitation-text">
             <h3>The Living Garden</h3>
             <p>Scan to plant a flower</p>
-            <a href="${this.settings?.visitorUrl || '/create'}" target="_blank" class="visitor-url-label" id="visitor-link">
-              ${this.settings?.visitorUrl ? this.cleanUrl(this.settings.visitorUrl) : 'thelivinggarden.art/create'}
+            <a href="${targetUrl}" target="_blank" class="visitor-url-label" id="visitor-link">
+              ${this.cleanUrl(targetUrl)}
             </a>
             ${isLocalMode ? '<div class="local-badge" title="Running in multi-tab local broadcast mode">Local Multi-Tab Demo</div>' : ''}
           </div>
@@ -244,7 +252,7 @@ export class GardenView {
     const canvas = this.container.querySelector('#qr-code-canvas') as HTMLCanvasElement;
     if (!canvas) return;
 
-    const targetUrl = this.settings?.visitorUrl || `${window.location.origin}/create`;
+    const targetUrl = this.getVisitorTargetUrl();
     try {
       await QRCode.toCanvas(canvas, targetUrl, {
         width: 110,

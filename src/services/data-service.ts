@@ -4,11 +4,27 @@ import { calculateSlotPlacement } from './terrain';
 import { generateFlowerCode, sanitizePlainMessage, truncateGraphemes } from './text-utils';
 import { SAMPLE_FLOWERS } from './sample-flowers';
 
+export function getAppBaseUrl(): string {
+  if (typeof window === 'undefined') return 'https://thelivinggarden.art';
+  const origin = window.location.origin;
+  const path = window.location.pathname;
+  const segments = path.split('/').filter(Boolean);
+  const knownRoutes = ['garden', 'create', 'admin', 'index.html'];
+  const basePath = segments.length > 0 && !knownRoutes.includes(segments[0])
+    ? `/${segments[0]}`
+    : '';
+  return `${origin}${basePath}`;
+}
+
+export function getDefaultVisitorUrl(): string {
+  return `${getAppBaseUrl()}/#/create`;
+}
+
 const DEFAULT_SETTINGS: InstallationSettings = {
   approveBeforePlanting: false,
   revealHoldSeconds: 6,
   catchUpLimit: 20,
-  visitorUrl: typeof window !== 'undefined' ? `${window.location.origin}/create` : 'https://thelivinggarden.art/create',
+  visitorUrl: typeof window !== 'undefined' ? getDefaultVisitorUrl() : 'https://thelivinggarden.art/create',
   submissionsPaused: false,
   qualityPreset: 'high',
 };
@@ -105,7 +121,18 @@ export class DataService {
     const saved = localStorage.getItem('living_garden_settings');
     if (saved) {
       try {
-        return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        if (
+          !parsed.visitorUrl ||
+          parsed.visitorUrl.endsWith('.github.io/create') ||
+          (typeof window !== 'undefined' &&
+            parsed.visitorUrl.startsWith(window.location.origin) &&
+            !parsed.visitorUrl.includes('/virtual-flower-garden') &&
+            window.location.pathname.includes('/virtual-flower-garden'))
+        ) {
+          parsed.visitorUrl = getDefaultVisitorUrl();
+        }
+        return { ...DEFAULT_SETTINGS, ...parsed };
       } catch {
         // fallback
       }
