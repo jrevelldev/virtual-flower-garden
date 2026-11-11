@@ -222,7 +222,7 @@ export function createAtmosphericSkyDome(): {
       return;
     }
 
-    if (hour >= 5.0 && hour < 8.5) {
+    if (hour >= 5.5 && hour < 8.5) {
       setMode('dawn');
     } else if (hour >= 8.5 && hour < 16.5) {
       setMode('sunny');
@@ -232,13 +232,20 @@ export function createAtmosphericSkyDome(): {
       setMode('night');
     }
 
-    // Calculate smooth orbital sun arc for daytime
+    // Continuous 24h orbital arc across the horizon
     if (hour >= 5.5 && hour <= 19.5) {
-      const angle = ((hour - 6.0) / 13.0) * Math.PI;
+      // Day / Dawn / Sunset: Sun rises in East, peaks at noon, sets in West
+      const progress = (hour - 5.5) / 14.0; // 0.0 at dawn, 0.5 at noon, 1.0 at dusk
+      const angle = progress * Math.PI;
       const x = -Math.cos(angle) * 70;
-      const y = Math.sin(angle) * 65 + 10;
+      const y = Math.sin(angle) * 65; // Peaks high at noon, meets horizon at 5.5 & 19.5
       const z = 30;
       uniforms.uSunPos.value.set(x, y, z).normalize();
+      targetSunGlow = Math.min(1.4, Math.sin(angle) * 1.5 + 0.2);
+    } else {
+      // Night: Sun is below the horizon; no sun disk in night sky
+      targetSunGlow = 0.0;
+      uniforms.uSunPos.value.set(20, 50, -30).normalize();
     }
   };
 
