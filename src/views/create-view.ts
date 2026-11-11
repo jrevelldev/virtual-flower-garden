@@ -51,10 +51,12 @@ export class CreateView {
   private fallbackCanvas: HTMLCanvasElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
-  // Touch rotation in preview
+  // Touch / mouse rotation and tilt in preview
   private previewRotationY = 0;
+  private previewPitch = 0;
   private isPreviewDragging = false;
   private lastDragX = 0;
+  private lastDragY = 0;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -471,7 +473,7 @@ export class CreateView {
     this.resizeObserver.observe(holder);
 
     // Lights
-    const keyLight = new THREE.DirectionalLight('#fff5e6', 2.0);
+    const keyLight = new THREE.DirectionalLight('#fff5e6', 1.8);
     keyLight.position.set(3, 5, 4);
     this.previewScene.add(keyLight);
 
@@ -479,7 +481,12 @@ export class CreateView {
     fillLight.position.set(-3, 2, -2);
     this.previewScene.add(fillLight);
 
-    const amb = new THREE.AmbientLight('#ffffff', 0.6);
+    // Overhead frontal light to illuminate flower face and inner petals
+    const topLight = new THREE.DirectionalLight('#ffffff', 1.5);
+    topLight.position.set(0, 6, 3);
+    this.previewScene.add(topLight);
+
+    const amb = new THREE.AmbientLight('#ffffff', 0.65);
     this.previewScene.add(amb);
 
     // Ground circle disk
@@ -529,6 +536,30 @@ export class CreateView {
     this.updatePreviewObject();
   }
 
+  private updatePreviewCamera(): void {
+    if (!this.previewCamera) return;
+
+    const stemHeight = Math.max(0.6, this.design.stemHeight);
+    const petalLen = Math.max(0.4, this.design.petalLength);
+    // Estimated flower top including petal flare
+    const flowerTop = stemHeight + petalLen * 0.75;
+    // Target focus point: upper middle of flower structure
+    const targetY = flowerTop * 0.52;
+
+    // Headroom calculation: ensure full flower plus generous 38% margin fits in vertical FOV
+    const fovRad = (38 * 0.5 * Math.PI) / 180;
+    const neededSpan = flowerTop * 1.38;
+    const baseDist = Math.max(4.8, neededSpan / (2 * Math.tan(fovRad)));
+
+    // Elevation angle: base 22 degrees downward beauty view + interactive vertical drag
+    const pitchAngle = (22 * Math.PI) / 180 + this.previewPitch;
+    const camZ = baseDist * Math.cos(pitchAngle);
+    const camY = targetY + baseDist * Math.sin(pitchAngle);
+
+    this.previewCamera.position.set(0, camY, camZ);
+    this.previewCamera.lookAt(0, targetY, 0);
+  }
+
   private updatePreviewObject(): void {
     if (!this.isWebGLSupported && this.fallbackCanvas) {
       const ctx = this.fallbackCanvas.getContext('2d');
@@ -549,36 +580,31 @@ export class CreateView {
     this.previewFlowerInstance = generateFlowerObject(this.design, 1);
     this.previewFlowerInstance.rootGroup.position.set(0, 0, 0);
     this.previewFlowerInstance.rootGroup.rotation.y = this.previewRotationY;
-    // Graceful forward tilt toward camera so viewer sees into the flower face
-    this.previewFlowerInstance.headGroup.rotation.x = 0.28;
+    // Graceful forward tilt (approx 22 degrees) toward camera so viewer sees flower face and layers
+    this.previewFlowerInstance.headGroup.rotation.x = 0.38;
     this.previewScene.add(this.previewFlowerInstance.rootGroup);
 
-    // Frame the flower with a flattering beauty angle and generous headroom
-    if (this.previewCamera) {
-      const flowerHeight = this.previewFlowerInstance.height || 1.8;
-      // Center the camera focus on the middle of the whole plant
-      const targetY = flowerHeight * 0.50;
-      // Flattering downward beauty angle with ample headroom on all sides
-      const camY = flowerHeight * 0.72;
-      const camDist = Math.max(4.6, flowerHeight * 1.55 + this.design.petalLength * 1.0);
-
-      this.previewCamera.position.set(0, camY, camDist);
-      this.previewCamera.lookAt(0, targetY, 0);
-    }
+    this.updatePreviewCamera();
   }
 
   private bindPreviewDrag(domElement: HTMLElement): void {
     domElement.addEventListener('pointerdown', (e) => {
       this.isPreviewDragging = true;
       this.lastDragX = e.clientX;
+      this.lastDragY = e.clientY;
       domElement.setPointerCapture(e.pointerId);
     });
 
     domElement.addEventListener('pointermove', (e) => {
       if (!this.isPreviewDragging) return;
       const dx = e.clientX - this.lastDragX;
+      const dy = e.clientY - this.lastDragY;
       this.previewRotationY += dx * 0.015;
+      // Allow vertical drag to view from higher or lower angles
+      this.previewPitch = Math.max(-0.25, Math.min(0.38, this.previewPitch - dy * 0.006));
       this.lastDragX = e.clientX;
+      this.lastDragY = e.clientY;
+      this.updatePreviewCamera();
     });
 
     const stopDrag = (e: PointerEvent) => {
